@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Lectura de PH - Solenis</title>
+    <meta name="description" content="Reporte de lectura de PH a la descarga. Datos en tiempo real de Supabase.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Chart.js & Moment for Time Series -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment"></script>
+</head>
+<body>
+    <!-- Top Navbar with Logo on the Top Left -->
+    <nav class="top-navbar">
+        <div class="logo">
+             <!-- Utiliza logo.png si existe, si no usa un SVG en línea como fallback para Solenis -->
+             <img src="logo.png" alt="Solenis Logo" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 150 40\'><path d=\'M10 25 Q 15 10, 25 15 T 40 25\' stroke=\'%2300C895\' stroke-width=\'5\' fill=\'none\' stroke-linecap=\'round\'/><text x=\'50\' y=\'30\' font-family=\'Inter, sans-serif\' font-weight=\'bold\' font-size=\'26\' fill=\'%23051C2C\'>Solenis</text></svg>'"/>
+        </div>
+        <h1>REPORTE DE LECTURA DE PH A LA DESCARGA</h1>
+    </nav>
+    <div class="container">
+        <!-- Panel Izquierdo -->
+        <div class="left-panel">
+            <!-- Control de Filtro de Fechas -->
+            <div class="controls-card">
+                <h2>Filtros de Búsqueda</h2>
+                <div class="date-controls">
+                     <div class="date-row">
+                         <div class="input-group">
+                             <label for="startDate">Fecha Inicial</label>
+                             <input type="date" id="startDate" name="startDate">
+                         </div>
+                         <div class="input-group">
+                             <label for="endDate">Fecha Final</label>
+                             <input type="date" id="endDate" name="endDate">
+                         </div>
+                     </div>
+                     <div class="button-group">
+                         <button id="filterBtn" class="primary-btn">Consultar Datos</button>
+                         <button id="exportBtn" class="secondary-btn">Exportar a CSV</button>
+                     </div>
+                </div>
+            </div>
+
+            <!-- Tabla de Resultados con Scroll -->
+            <div class="table-container fade-in">
+                <div class="table-scroll">
+                    <table id="dataTable">
+                        <thead>
+                            <tr>
+                                <th>Fecha y Hora (Timestamp)</th>
+                                <th>PH</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- Los datos se inyectarán aquí vía JavaScript -->
+                            <tr>
+                                <td colspan="2" style="text-align: center; color: var(--text-muted)">Cargando datos...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Derecho -->
+        <div class="right-panel">
+             <!-- Gráfica -->
+             <div class="chart-card fade-in delay-1">
+                 <div class="chart-header">
+                     <h2>Gráfica de Tendencia de PH</h2>
+                     <!-- Información del punto seleccionado -->
+                     <div id="chartTooltipData" class="selected-point-info hidden">
+                         <span class="pulse-dot"></span>
+                         <strong>Punto seleccionado:</strong> <span id="selectedTime"></span> - PH: <span id="selectedPh" class="ph-value"></span>
+                     </div>
+                 </div>
+                 <div class="chart-wrapper">
+                     <canvas id="phChart"></canvas>
+                 </div>
+             </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
