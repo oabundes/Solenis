@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 import uvicorn
 from dotenv import load_dotenv
-
+from zoneinfo import ZoneInfo
 load_dotenv()
 
 app = FastAPI()
@@ -30,6 +30,20 @@ class DataPoint(BaseModel):
 
 @app.get("/api/data", response_model=List[DataPoint])
 def get_data(start_date: Optional[str] = None, end_date: Optional[str] = None):
+
+    tz_local = ZoneInfo('America/Mexico_City')
+
+    def convertir_timestamp(data):
+        for row in data:
+            if row.get('timestamp'):
+                utc_dt = datetime.fromisoformat(row['timestamp'].replace('Z', '+00:00'))
+                row['timestamp'] = utc_dt.astimezone(tz_local).strftime('%Y-%m-%dT%H:%M:%S')
+        return data
+
+
+
+
+
     if not supabase:
         # Mock data for testing when credentials aren't set
         import random
@@ -52,7 +66,7 @@ def get_data(start_date: Optional[str] = None, end_date: Optional[str] = None):
             end_date_str = end_date + "T23:59:59" if len(end_date) == 10 else end_date
             mock = [d for d in mock if d["timestamp"] <= end_date_str]
             
-        return mock
+        return convertir_timestamp(mock)
         
     query = supabase.table("pHLogg").select("timestamp", "PH").order("timestamp", desc=True)
     
@@ -65,7 +79,7 @@ def get_data(start_date: Optional[str] = None, end_date: Optional[str] = None):
             query = query.lte("timestamp", end_date)
             
     response = query.execute()
-    return response.data
+    return convertir_timestamp(response.data)
 
 # Servir los archivos estáticos en la raíz
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
