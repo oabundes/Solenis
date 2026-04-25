@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 # Configuración (Usa variables de entorno en Railway)
 PARTICLE_TOKEN = os.getenv("PARTICLE_TOKEN")
-DEVICE_ID = os.getenv("DEVICE_ID")
+DEVICE_ID = os.getenv("BORON1_ID")
 
 @app.route("/webhook-twilio", methods=['POST'])
 def handle_whatsapp():
