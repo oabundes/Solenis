@@ -58,6 +58,9 @@ def get_data(
             if row.get('timestamp'):
                 utc_dt = datetime.fromisoformat(row['timestamp'].replace('Z', '+00:00'))
                 row['timestamp'] = utc_dt.astimezone(tz_local).strftime('%Y-%m-%dT%H:%M:%S')
+            # Limpiar espacios del evento
+            if isinstance(row.get('evento'), str):
+                row['evento'] = row['evento'].strip()
         return data
 
     if not supabase:
@@ -81,8 +84,18 @@ def get_data(
         return convertir_timestamp(mock)
 
     # Consulta real a Supabase
-    gte_val = (start_date[:10] + "T00:00:00-06:00") if start_date else None
-    lte_val = (end_date[:10]   + "T23:59:59-06:00") if end_date   else None
+    # México (UTC-6): 00:00 local = 06:00 UTC, 23:59:59 local = siguiente día 05:59:59 UTC
+    gte_val = None
+    lte_val = None
+    if start_date:
+        gte_val = start_date[:10] + "T06:00:00+00:00"
+    if end_date:
+        d_next = date.fromisoformat(end_date[:10]) + timedelta(days=1)
+        lte_val = d_next.isoformat() + "T05:59:59+00:00"
+
+    print(f"DEBUG gte_val: {gte_val}")
+    print(f"DEBUG lte_val: {lte_val}")
+    print(f"DEBUG evento filtro: {evento}")
 
     query = (
         supabase.table("pHLogg")
@@ -94,11 +107,19 @@ def get_data(
         query = query.gte("timestamp", gte_val)
     if lte_val:
         query = query.lte("timestamp", lte_val)
-    if evento:
-        query = query.in_("evento", evento)  # ya son strings: ["DESCARGA", "INICIA", "TERMINA"]
 
     response = query.execute()
-    return convertir_timestamp(response.data)
+    data = convertir_timestamp(response.data)
+
+    # Filtrar por evento en Python (después de trim) para evitar problema de espacios en BD
+    if evento:
+        eventos_limpios = [e.strip().upper() for e in evento]
+        data = [row for row in data if (row.get('evento') or '').strip().upper() in eventos_limpios]
+
+    print(f"DEBUG filas devueltas: {len(data)}")
+    if data:
+        print(f"DEBUG primera fila: {data[0]}")
+    return data
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
