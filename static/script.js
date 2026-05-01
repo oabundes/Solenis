@@ -126,7 +126,7 @@ async function fetchData() {
         banner.classList.add('hidden');
 
         updateTable(currentData);
-        updateChart(currentData);
+        await updateChart(currentData);
         updateResultsHeader(currentData, startDate, endDate);
         document.getElementById('chartTooltipData').classList.add('hidden');
 
@@ -155,8 +155,9 @@ function updateResultsHeader(data, start, end) {
     count.textContent = `${data.length} registro${data.length !== 1 ? 's' : ''}`;
 
     if (start && end) {
-        const s = new Date(start).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
-        const e = new Date(end).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+        // Agregar T12:00:00 para evitar desfase de zona horaria al mostrar
+        const s = new Date(start + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+        const e = new Date(end   + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
         range.textContent = `${s} → ${e}`;
     }
 }
@@ -235,7 +236,7 @@ function updateTable(data) {
 // ─────────────────────────────────────────────
 // Actualizar gráfica
 // ─────────────────────────────────────────────
-function updateChart(data) {
+async function updateChart(data) {
     const ctx = document.getElementById('phChart').getContext('2d');
     const chartData = data.map(row => ({ x: row.timestamp, y: row.PH }));
 
@@ -245,6 +246,23 @@ function updateChart(data) {
         minPh = Math.max(0, Math.floor(Math.min(...vals)) - 1);
         maxPh = Math.min(14, Math.ceil(Math.max(...vals)) + 1);
     }
+
+    // Traer límites desde Supabase
+    let limitMin = 6.0, limitMax = 8.0;
+    try {
+        const res = await fetch('/api/parametros');
+        if (res.ok) {
+            const params = await res.json();
+            limitMin = params.MIN_PH_DESC ?? limitMin;
+            limitMax = params.MAX_PH_DESC ?? limitMax;
+        }
+    } catch (e) {
+        console.warn('No se pudieron cargar los parámetros de límite:', e);
+    }
+
+    // Ajustar escala para que las líneas de límite quepan
+    minPh = Math.min(minPh, Math.floor(limitMin) - 1);
+    maxPh = Math.max(maxPh, Math.ceil(limitMax) + 1);
 
     if (phChart) phChart.destroy();
 
@@ -299,6 +317,44 @@ function updateChart(data) {
             },
             plugins: {
                 legend: { display: false },
+                annotation: {
+                    annotations: {
+                        limitMax: {
+                            type: 'line',
+                            yMin: limitMax,
+                            yMax: limitMax,
+                            borderColor: 'rgba(239,68,68,0.7)',
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            label: {
+                                display: true,
+                                content: `Máx: ${limitMax}`,
+                                position: 'end',
+                                backgroundColor: 'rgba(239,68,68,0.1)',
+                                color: '#ef4444',
+                                font: { size: 11, weight: '700', family: 'Inter' },
+                                padding: 4
+                            }
+                        },
+                        limitMin: {
+                            type: 'line',
+                            yMin: limitMin,
+                            yMax: limitMin,
+                            borderColor: 'rgba(239,68,68,0.7)',
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            label: {
+                                display: true,
+                                content: `Mín: ${limitMin}`,
+                                position: 'end',
+                                backgroundColor: 'rgba(239,68,68,0.1)',
+                                color: '#ef4444',
+                                font: { size: 11, weight: '700', family: 'Inter' },
+                                padding: 4
+                            }
+                        }
+                    }
+                },
                 tooltip: {
                     padding: 14,
                     backgroundColor: '#FFFFFF',
@@ -395,7 +451,7 @@ function exportToCSV() {
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);     
+    document.body.removeChild(link);
 }
 
 // ─────────────────────────────────────────────

@@ -34,6 +34,18 @@ class DataPoint(BaseModel):
     PH: float
     evento: Optional[str] = None   # texto: DESCARGA, INICIA, TERMINA
 
+@app.get("/api/parametros")
+def get_parametros():
+    if not supabase:
+        return {"MIN_PH_DESC": 6.0, "MAX_PH_DESC": 8.0}
+    try:
+        response = supabase.table("parametros").select("parametro, valor").in_("parametro", ["MIN_PH_DESC", "MAX_PH_DESC"]).execute()
+        result = {row["parametro"]: row["valor"] for row in response.data}
+        return result
+    except Exception as e:
+        print(f"Error fetching parametros: {e}")
+        return {"MIN_PH_DESC": 6.0, "MAX_PH_DESC": 8.0}
+
 @app.get("/api/data", response_model=List[DataPoint])
 def get_data(
     start_date: Optional[str] = None,
