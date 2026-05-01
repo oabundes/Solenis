@@ -103,9 +103,14 @@ async function fetchData() {
             const response = await fetch(`${API_URL}?${params.toString()}`);
             if (!response.ok) throw new Error('Server error');
             const text = await response.text();
-            currentData = JSON.parse(text);
+            const parsed = JSON.parse(text);
+            if (Array.isArray(parsed) && parsed.length === 0) {
+                // Backend respondió pero sin datos — usar simulados
+                throw new Error('Empty response');
+            }
+            currentData = parsed;
         } catch (fetchErr) {
-            console.warn('Backend no disponible, usando datos simulados.', fetchErr);
+            console.warn('Backend sin datos o no disponible, usando datos simulados.', fetchErr);
             currentData = generateSimulatedData(startDate, endDate, selectedEventos);
             usedSimulated = true;
         }
