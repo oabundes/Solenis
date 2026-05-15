@@ -1,35 +1,42 @@
-from flask import Flask, request
+from fastapi import FastAPI, Form, Response
 import requests
 import os
 
-app = Flask(__name__)
+app = FastAPI()
 
-# Configuración (Usa variables de entorno en Railway)
-PARTICLE_TOKEN = os.getenv("PARTICLE_TOKEN")
+# Configuración mediante variables de entorno en Railway
+# Recuerda configurar PARTICLE_CLIENT_ID, PARTICLE_CLIENT_SECRET y BORON1_ID
+CLIENT_ID = os.getenv("PARTICLE_CLIENT_ID")
+CLIENT_SECRET = os.getenv("PARTICLE_CLIENT_SECRET")
 DEVICE_ID = os.getenv("BORON1_ID")
 
-@app.route("/webhook-twilio", methods=['POST'])
-def handle_whatsapp():
-    # 1. Recibir datos de Twilio
-    incoming_msg = request.form.get('Body', '').lower()
+@app.post("/webhook-twilio")
+async def handle_whatsapp(Body: str = Form(...)):
+    """
+    Recibe el mensaje de Twilio y dispara un evento en Particle
+    si se detecta la palabra clave 'consulta'.
+    """
+    mensaje = Body.lower()
     
-    # 2. Filtrar mensaje
-    if "consulta" in incoming_msg:
-        # 3. Disparar evento en Particle
+    # Registro de actividad en los logs de Railway
+    print(f"Procesando mensaje: {mensaje}")
+    
+    if "consulta" in mensaje:
         url = f"https://api.particle.io/v1/devices/{DEVICE_ID}/events"
-        data = {
+        
+        payload = {
             "name": "recibir-whatsapp",
             "data": "consultar_ph",
             "private": "true"
         }
-        headers = {"Authorization": f"Bearer {PARTICLE_TOKEN}"}
         
-        response = requests.post(url, data=data, headers=headers)
+        # Autenticación de API User mediante Basic Auth (ID, Secret)
+        response = requests.post(url, auth=(CLIENT_ID, CLIENT_SECRET), data=payload)
         
-        if response.status_code == 200:
-            return "OK", 200
+        if response.status_code in [200, 201]:
+            return Response(content="OK - Evento enviado", media_type="text/plain")
+        else:
+            print(f"Error en Particle: {response.text}")
+            return Response(content="Error en Particle Cloud", status_code=500)
             
-    return "Ignorado", 200
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    return Response(content="Mensaje ignorado", media_type="text/plain")
