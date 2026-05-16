@@ -33,7 +33,7 @@ async def handle_whatsapp(Body: str = Form(...)):
         print("Payload:", payload)  
         print("Token existe:", bool(ACCESS_TOKEN))
         # Autenticación de API User mediante Basic Auth (ID, Secret)
-        response = requests.post(url, headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}, json=payload)
+        response = requests.post(url, headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}, data=payload)
         
         if response.status_code in [200, 201]:
             return Response(content="OK - Evento enviado", media_type="text/plain")
