@@ -8,8 +8,8 @@ app = FastAPI()
 # Recuerda configurar PARTICLE_CLIENT_ID, PARTICLE_CLIENT_SECRET y BORON1_ID
 CLIENT_ID = os.getenv("PARTICLE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("PARTICLE_CLIENT_SECRET")
-DEVICE_ID = os.getenv("BORON1_ID")
-
+DEVICE_ID = os.getenv("BORON2_ID")
+ACCESS_TOKEN = os.getenv("PARTICLE_ACCESS_TOKEN")
 @app.post("/webhook-twilio")
 async def handle_whatsapp(Body: str = Form(...)):
     """
@@ -29,9 +29,11 @@ async def handle_whatsapp(Body: str = Form(...)):
             "data": "consultar_ph",
             "private": "true"
         }
-        
+        print("URL:", url)
+        print("Payload:", payload)  
+        print("Token existe:", bool(ACCESS_TOKEN))
         # Autenticación de API User mediante Basic Auth (ID, Secret)
-        response = requests.post(url, auth=(CLIENT_ID, CLIENT_SECRET), data=payload)
+        response = requests.post(url, headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}, json=payload)
         
         if response.status_code in [200, 201]:
             return Response(content="OK - Evento enviado", media_type="text/plain")
