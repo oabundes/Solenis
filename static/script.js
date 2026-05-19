@@ -46,7 +46,7 @@ function validateDateRange() {
 
     if (start && end) {
         const diff = (new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24);
-        if (diff > 62) {
+        if (diff > 31) {
             alert.classList.remove('hidden');
             btn.disabled = true;
             return false;
@@ -58,7 +58,7 @@ function validateDateRange() {
             return false;
         }
     }
-    alert.textContent = '⚠️ El rango no puede superar 2 meses.';
+    alert.textContent = '⚠️ El rango no puede superar 1 mese.';
     alert.classList.add('hidden');
     btn.disabled = false;
     return true;

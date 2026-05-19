@@ -6,6 +6,9 @@ import os
 from datetime import datetime, date, timedelta, timezone
 import uvicorn
 from dotenv import load_dotenv
+
+from middleware import router as middleware_router
+
 load_dotenv()
 
 try:
@@ -132,6 +135,10 @@ def get_data(
     if data:
         print(f"DEBUG primera fila: {data[0]}")
     return data
+
+app.inlclude_router(middleware_router)
+
+#app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 

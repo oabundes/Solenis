@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Form, Response
+from fastapi import FastAPI, Form, Response, APIRouter
 import requests
 import os
 
-app = FastAPI()
+app = APIRouter()
 
 # Configuración mediante variables de entorno en Railway
 # Recuerda configurar PARTICLE_CLIENT_ID, PARTICLE_CLIENT_SECRET y BORON1_ID
@@ -10,6 +10,7 @@ CLIENT_ID = os.getenv("PARTICLE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("PARTICLE_CLIENT_SECRET")
 DEVICE_ID = os.getenv("BORON2_ID")
 ACCESS_TOKEN = os.getenv("PARTICLE_ACCESS_TOKEN")
+
 @app.post("/webhook-twilio")
 async def handle_whatsapp(Body: str = Form(...)):
     """
