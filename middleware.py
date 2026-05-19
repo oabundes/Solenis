@@ -23,7 +23,7 @@ async def handle_whatsapp(Body: str = Form(...)):
     print(f"Procesando mensaje: {mensaje}")
     
     if "consulta" in mensaje:
-        url = f"https://api.particle.io/v1/events"
+        url = f"https://api.particle.io/v1/devices/{DEVICE_ID}/events"
         
         payload = {
             "name": "recibir_whatsapp",
