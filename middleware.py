@@ -28,7 +28,7 @@ async def handle_whatsapp(Body: str = Form(...)):
         payload = {
             "name": "recibir_whatsapp",
             "data": "consultar_ph",
-            "private": True
+            "private": "true"
         }
         print("URL:", url)
         print("Payload:", payload)  
