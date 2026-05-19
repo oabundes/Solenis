@@ -138,9 +138,9 @@ def get_data(
 
 app.include_router(middleware_router)
 
-  #####app.mount("/", StaticFiles(directory="static", html=True), name="static")
+  app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+##app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
