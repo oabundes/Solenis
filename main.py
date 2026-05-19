@@ -136,9 +136,9 @@ def get_data(
         print(f"DEBUG primera fila: {data[0]}")
     return data
 
-app.inlclude_router(middleware_router)
+app.include_router(middleware_router)
 
-#app.mount("/", StaticFiles(directory="static", html=True), name="static")
+  #####app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
