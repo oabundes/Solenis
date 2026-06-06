@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reporte de Lectura de PH - Solenis</title>
-    <meta name="description" content="Reporte de lectura de PH a la descarga. Datos en tiempo real de Supabase.">
+    <title>Reporte de Lecturas de Instrumentos - Solenis</title>
+    <meta name="description" content="Reporte de lecturas de instrumentos. Datos en tiempo real de Supabase.">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,7 +25,7 @@
         </div>
         <div class="navbar-title">
             <span class="navbar-subtitle">Dashboard de Monitoreo</span>
-            <h1>REPORTE DE LECTURA DE PH A LA DESCARGA DEL TANQUE DE NEUTRALIZACIÓN</h1>
+            <h1>REPORTE DE LECTURA DE INSTRUMENTOS</h1>
         </div>
         <div class="navbar-nav">
             <a href="index.html" class="primary-btn">PH</a>
@@ -41,11 +41,18 @@
         <!-- Panel Izquierdo -->
         <div class="left-panel">
 
-            <!-- Control de Filtro de Fechas -->
+            <!-- Control de Filtro de Fechas y Unidades -->
             <div class="controls-card fade-in">
                 <h2>Filtros de Búsqueda</h2>
 
                 <div class="date-controls">
+                    <!-- Dropdown Filtro Unidad -->
+                    <div class="input-group">
+                        <select id="unitFilter" name="unitFilter">
+                            <option value="">Todas las unidades</option>
+                        </select>
+                    </div>
+
                     <!-- Fechas -->
                     <div class="date-row">
                         <div class="input-group">
@@ -95,14 +102,14 @@
                     <table id="dataTable" style="table-layout: fixed;">
                         <colgroup>
                             <col style="width: 54%">
-                            <col style="width: 16%">
-                            <col style="width: 30%">
+                            <col style="width: 20%">
+                            <col style="width: 26%">
                         </colgroup>
                         <thead>
                             <tr>
                                 <th>Fecha y Hora</th>
-                                <th>PH</th>
-                                <th>Evento</th>
+                                <th>Valor</th>
+                                <th>Unidad</th>
                             </tr>
                         </thead>
                         <tbody id="tableBody">
@@ -119,52 +126,32 @@
         <div class="right-panel">
             <!-- Gráfica -->
             <div class="chart-card fade-in delay-2">
-                <!-- Filtro Evento -->
+                <!-- Filtro Evento alternativo (Vacío de checkboxes, sólo refresh) -->
                 <div class="evento-filter chart-evento-filter">
-                    <label class="filter-label">Filtrar por Evento</label>
-                    <div class="checkbox-filter-row">
-                        <div class="checkbox-group checkbox-group-inline">
-                            <label class="checkbox-item evento-descarga">
-                                <input type="checkbox" name="evento" value="DESCARGA" id="ev1" checked>
-                                <span class="checkbox-box"></span>
-                                <span class="checkbox-text">Descarga</span>
-                            </label>
-                            <label class="checkbox-item evento-inicia">
-                                <input type="checkbox" name="evento" value="INICIA" id="ev2" checked>
-                                <span class="checkbox-box"></span>
-                                <span class="checkbox-text">Inicia</span>
-                            </label>
-                            <label class="checkbox-item evento-termina">
-                                <input type="checkbox" name="evento" value="TERMINA" id="ev3" checked>
-                                <span class="checkbox-box"></span>
-                                <span class="checkbox-text">Termina</span>
-                            </label>
-                        </div>
+                    <label class="filter-label">Acciones</label>
+                    <div class="checkbox-filter-row" style="justify-content: flex-end;">
                         <button id="refreshBtn" class="refresh-btn">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582M20 20v-5h-.581M5.635 15A9 9 0 1 0 4.582 9H4"/></svg>
                             Actualizar
                         </button>
                     </div>
-                    <div id="eventoAlert" class="range-alert hidden">
-                        ⚠️ Selecciona al menos un tipo de evento.
-                    </div>
                 </div>
 
                 <div class="chart-header">
-                    <h2>Gráfica de Tendencia de PH</h2>
+                    <h2>Gráfica de Tendencia de Instrumentos</h2>
                     <!-- Información del punto seleccionado -->
                     <div id="chartTooltipData" class="selected-point-info hidden">
                         <span class="pulse-dot"></span>
-                        <strong>Punto:</strong>&nbsp;<span id="selectedTime"></span>&nbsp;—&nbsp;PH:&nbsp;<span id="selectedPh" class="ph-value"></span>
+                        <strong>Punto:</strong>&nbsp;<span id="selectedTime"></span>&nbsp;—&nbsp;Valor:&nbsp;<span id="selectedPh" class="ph-value"></span>
                     </div>
                 </div>
                 <div class="chart-wrapper">
-                    <canvas id="phChart"></canvas>
+                    <canvas id="instrumentChart"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="instrument_readings.js"></script>
 </body>
 </html>

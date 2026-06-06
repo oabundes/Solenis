@@ -1,24 +1,22 @@
-const API_URL = '/api/data';
-let phChart = null;
+const API_URL = '/api/instrument_data';
+const API_UNITS_URL = '/api/instrument_units';
+let instrumentChart = null;
 let currentData = [];
+let limitMin = 6.0;
+let limitMax = 8.0;
 
-// Etiquetas y colores por evento (ahora en TEXTO)
-const EVENTO_LABELS = {
-    'DESCARGA': 'Descarga',
-    'INICIA':   'Inicia',
-    'TERMINA':  'Termina'
-};
-
-const EVENTO_COLORS = {
-    'DESCARGA': { bg: 'rgba(0,200,149,0.12)',   text: '#007a5a', border: '#00C895' },
-    'INICIA':   { bg: 'rgba(59,130,246,0.12)',  text: '#1d4ed8', border: '#3b82f6' },
-    'TERMINA':  { bg: 'rgba(245,158,11,0.12)',  text: '#92400e', border: '#f59e0b' }
-};
+// Colors for chart
+const CHART_COLOR = '#00C895';
+const CHART_BG_START = 'rgba(0, 200, 149, 0.28)';
+const CHART_BG_END = 'rgba(0, 200, 149, 0.0)';
 
 // ─────────────────────────────────────────────
 // Inicialización
 // ─────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Cargar limites iniciales desde la API
+    await fetchLimits();
+
     const today = new Date();
     const lastWeek = new Date();
     lastWeek.setDate(today.getDate() - 7);
@@ -28,12 +26,53 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('filterBtn').addEventListener('click', fetchData);
     document.getElementById('exportBtn').addEventListener('click', exportToCSV);
     document.getElementById('refreshBtn').addEventListener('click', fetchData);
+    document.getElementById('unitFilter').addEventListener('change', fetchData);
 
     document.getElementById('startDate').addEventListener('change', validateDateRange);
     document.getElementById('endDate').addEventListener('change', validateDateRange);
 
-    fetchData();
+    // Poblar combo de unidades primero, luego consultar
+    await fetchUnits();
+    await fetchData();
 });
+
+// ─────────────────────────────────────────────
+// Cargar parámetros de límite
+// ─────────────────────────────────────────────
+async function fetchLimits() {
+    try {
+        const res = await fetch('/api/parametros');
+        if (res.ok) {
+            const params = await res.json();
+            limitMin = params.MIN_PH_DESC ?? limitMin;
+            limitMax = params.MAX_PH_DESC ?? limitMax;
+        }
+    } catch (e) {
+        console.warn('No se pudieron cargar los parámetros de límite:', e);
+    }
+}
+
+// ─────────────────────────────────────────────
+// Cargar catálogo de unidades
+// ─────────────────────────────────────────────
+async function fetchUnits() {
+    try {
+        const response = await fetch(API_UNITS_URL);
+        if (response.ok) {
+            const units = await response.json();
+            const select = document.getElementById('unitFilter');
+            select.innerHTML = '<option value="">Todas las unidades</option>';
+            units.forEach(unit => {
+                const opt = document.createElement('option');
+                opt.value = unit;
+                opt.textContent = unit;
+                select.appendChild(opt);
+            });
+        }
+    } catch (err) {
+        console.error('Error fetching units:', err);
+    }
+}
 
 // ─────────────────────────────────────────────
 // Validación de rango
@@ -46,7 +85,8 @@ function validateDateRange() {
 
     if (start && end) {
         const diff = (new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24);
-        if (diff > 31) {
+        if (diff > 62) {
+            alert.textContent = '⚠️ El rango no puede superar 2 meses.';
             alert.classList.remove('hidden');
             btn.disabled = true;
             return false;
@@ -58,18 +98,9 @@ function validateDateRange() {
             return false;
         }
     }
-    alert.textContent = '⚠️ El rango no puede superar 1 mes.';
     alert.classList.add('hidden');
     btn.disabled = false;
     return true;
-}
-
-// ─────────────────────────────────────────────
-// Obtener eventos seleccionados — ahora retorna TEXTO
-// ─────────────────────────────────────────────
-function getSelectedEventos() {
-    const checked = document.querySelectorAll('input[name="evento"]:checked');
-    return Array.from(checked).map(cb => cb.value); // "DESCARGA", "INICIA", "TERMINA"
 }
 
 // ─────────────────────────────────────────────
@@ -78,12 +109,10 @@ function getSelectedEventos() {
 async function fetchData() {
     if (!validateDateRange()) return;
 
-    const selectedEventos = getSelectedEventos();
-    const eventoAlert = document.getElementById('eventoAlert');
-    eventoAlert.classList.add('hidden');
-
     const startDate = document.getElementById('startDate').value;
     const endDate   = document.getElementById('endDate').value;
+    const selectedUnit = document.getElementById('unitFilter').value;
+
     const btn = document.getElementById('filterBtn');
     btn.innerHTML = '<span class="spinner"></span> Cargando...';
     btn.disabled = true;
@@ -92,14 +121,11 @@ async function fetchData() {
         const params = new URLSearchParams();
         if (startDate) params.append('start_date', startDate);
         if (endDate)   params.append('end_date', endDate);
-        // Solo agregar filtro de evento si hay algo seleccionado
-        if (selectedEventos.length > 0) {
-            selectedEventos.forEach(ev => params.append('evento', ev));
-        } // envía "DESCARGA", "INICIA", "TERMINA"
+        if (selectedUnit) params.append('unit', selectedUnit);
 
-        let usedSimulated = false;
+        let response = null;
         try {
-            const response = await fetch(`${API_URL}?${params.toString()}`);
+            response = await fetch(`${API_URL}?${params.toString()}`);
             if (!response.ok) {
                 const errText = await response.text();
                 let errMsg = `Error del servidor (${response.status})`;
@@ -109,7 +135,7 @@ async function fetchData() {
                 } catch (_) {}
                 throw new Error(errMsg);
             }
-            currentData = JSON.parse(await response.text());
+            currentData = await response.json();
         } catch (fetchErr) {
             if (fetchErr.message.startsWith('Error del servidor') || fetchErr.message === 'Failed to fetch') {
                 showError(fetchErr.message === 'Failed to fetch'
@@ -117,16 +143,19 @@ async function fetchData() {
                     : fetchErr.message);
                 return;
             }
-            // Otro error inesperado
             showError(`Error inesperado: ${fetchErr.message}`);
             return;
         }
 
         const banner = document.getElementById('simulatedBanner');
+        // El servidor FastAPI de Solenis tiene un mecanismo de simulación si Supabase falla
+        // Si no hay supabase, devuelve datos mock pero response.ok sigue siendo True.
+        // Así que decidimos si mostrar el banner en base a si el backend no cuenta con supabase.
+        // Pero para simplificar, si se conecta exitosamente a la API local ocultamos el banner.
         banner.classList.add('hidden');
 
         updateTable(currentData);
-        await updateChart(currentData);
+        updateChart(currentData, selectedUnit);
         updateResultsHeader(currentData, startDate, endDate);
         document.getElementById('chartTooltipData').classList.add('hidden');
 
@@ -155,38 +184,10 @@ function updateResultsHeader(data, start, end) {
     count.textContent = `${data.length} registro${data.length !== 1 ? 's' : ''}`;
 
     if (start && end) {
-        // Agregar T12:00:00 para evitar desfase de zona horaria al mostrar
         const s = new Date(start + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
         const e = new Date(end   + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
         range.textContent = `${s} → ${e}`;
     }
-}
-
-// ─────────────────────────────────────────────
-// Generar datos simulados (evento como texto)
-// ─────────────────────────────────────────────
-function generateSimulatedData(startDate, endDate, selectedEventos) {
-    const data = [];
-    const start = new Date(startDate);
-    const end   = new Date(endDate);
-    end.setHours(23, 59, 59);
-
-    const msPerDay = 1000 * 60 * 60 * 24;
-    const days = Math.round((end - start) / msPerDay) + 1;
-    const pointsPerDay = 8;
-    let basePh = 7.0;
-
-    for (let d = 0; d < days; d++) {
-        for (let p = 0; p < pointsPerDay; p++) {
-            const ts = new Date(start.getTime() + d * msPerDay + (p / pointsPerDay) * msPerDay);
-            if (ts > end) break;
-            basePh += (Math.random() - 0.49) * 0.3;
-            basePh = Math.max(5.5, Math.min(9.5, basePh));
-            const evento = selectedEventos[Math.floor(Math.random() * selectedEventos.length)];
-            data.push({ timestamp: ts.toISOString(), evento, PH: parseFloat(basePh.toFixed(2)) });
-        }
-    }
-    return data;
 }
 
 // ─────────────────────────────────────────────
@@ -206,28 +207,27 @@ function updateTable(data) {
 
     data.forEach((row, index) => {
         const tr = document.createElement('tr');
-        const dateObj = new Date(row.timestamp);
+        const dateObj = new Date(row.created_at);
         const formattedDate = dateObj.toLocaleString('es-MX', {
             year: 'numeric', month: '2-digit', day: '2-digit',
             hour: '2-digit', minute: '2-digit', second: '2-digit'
         });
 
-        // evento es texto: "DESCARGA", "INICIA", "TERMINA"
-        const evKey    = (row.evento || '').toString().toUpperCase();
-        const evLabel  = EVENTO_LABELS[evKey] || evKey || '—';
-        const evColors = EVENTO_COLORS[evKey] || { bg: '#F1F5F9', text: '#64748B', border: '#CBD5E1' };
-        const phClass  = (row.PH < 6.5 || row.PH > 8.5) ? 'ph-high' : 'ph-normal';
+        const unitStr = row.unit || '—';
+        const isPhDescarga = unitStr.toLowerCase().includes('descarga') || unitStr.toLowerCase() === 'ph';
+        const isOut = isPhDescarga && (row.extracted_value < limitMin || row.extracted_value > limitMax);
+        const valClass = isOut ? 'ph-high' : 'ph-normal';
 
         tr.innerHTML = `
             <td class="td-timestamp">${formattedDate}</td>
-            <td class="${phClass}">${row.PH.toFixed(2)}</td>
-            <td class="td-evento"><span class="evento-badge" style="background:${evColors.bg};color:${evColors.text};border-color:${evColors.border}">${evLabel}</span></td>
+            <td class="${valClass}">${row.extracted_value.toFixed(2)}</td>
+            <td class="td-evento"><span class="evento-badge" style="background:rgba(59,130,246,0.08);color:#1d4ed8;border-color:rgba(59,130,246,0.25)">${unitStr}</span></td>
         `;
 
         tr.addEventListener('click', () => {
             document.querySelectorAll('tbody tr').forEach(r => r.classList.remove('selected'));
             tr.classList.add('selected');
-            showTooltip(formattedDate, row.PH, evLabel);
+            showTooltip(formattedDate, row.extracted_value, unitStr);
         });
         tbody.appendChild(tr);
     });
@@ -236,53 +236,79 @@ function updateTable(data) {
 // ─────────────────────────────────────────────
 // Actualizar gráfica
 // ─────────────────────────────────────────────
-async function updateChart(data) {
-    const ctx = document.getElementById('phChart').getContext('2d');
-    const chartData = data.map(row => ({ x: row.timestamp, y: row.PH }));
+function updateChart(data, selectedUnit) {
+    const ctx = document.getElementById('instrumentChart').getContext('2d');
+    const chartData = data.map(row => ({ x: row.created_at, y: row.extracted_value }));
 
-    let minPh = 0, maxPh = 14;
+    let minY = 0, maxY = 14;
     if (chartData.length > 0) {
         const vals = chartData.map(d => d.y);
-        minPh = Math.max(0, Math.floor(Math.min(...vals)) - 1);
-        maxPh = Math.min(14, Math.ceil(Math.max(...vals)) + 1);
+        minY = Math.max(0, Math.floor(Math.min(...vals)) - 1);
+        maxY = Math.ceil(Math.max(...vals)) + 1;
     }
 
-    // Traer límites desde Supabase
-    let limitMin = 6.0, limitMax = 8.0;
-    try {
-        const res = await fetch('/api/parametros');
-        if (res.ok) {
-            const params = await res.json();
-            limitMin = params.MIN_PH_DESC ?? limitMin;
-            limitMax = params.MAX_PH_DESC ?? limitMax;
-        }
-    } catch (e) {
-        console.warn('No se pudieron cargar los parámetros de límite:', e);
+    // Dibujar los límites solo si la unidad es pH_Descarga
+    const drawLimits = selectedUnit.toLowerCase().includes('descarga') || selectedUnit.toLowerCase() === 'ph';
+    if (drawLimits) {
+        minY = Math.min(minY, Math.floor(limitMin) - 1);
+        maxY = Math.max(maxY, Math.ceil(limitMax) + 1);
     }
 
-    // Ajustar escala para que las líneas de límite quepan
-    minPh = Math.min(minPh, Math.floor(limitMin) - 1);
-    maxPh = Math.max(maxPh, Math.ceil(limitMax) + 1);
-
-    if (phChart) phChart.destroy();
+    if (instrumentChart) instrumentChart.destroy();
 
     const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, 'rgba(0, 200, 149, 0.28)');
-    gradient.addColorStop(1, 'rgba(0, 200, 149, 0.0)');
+    gradient.addColorStop(0, CHART_BG_START);
+    gradient.addColorStop(1, CHART_BG_END);
 
-    phChart = new Chart(ctx, {
+    // Configuración de anotaciones (líneas de límite)
+    const annotations = {};
+    if (drawLimits) {
+        annotations.limitMax = {
+            type: 'line',
+            yMin: limitMax,
+            yMax: limitMax,
+            borderColor: 'rgba(239,68,68,0.7)',
+            borderWidth: 2,
+            borderDash: [6, 4],
+            label: {
+                display: true,
+                content: `Máx: ${limitMax}`,
+                position: 'end',
+                backgroundColor: 'rgba(239,68,68,0.1)',
+                color: '#ef4444',
+                font: { size: 11, weight: '700', family: 'Inter' },
+                padding: 4
+            }
+        };
+        annotations.limitMin = {
+            type: 'line',
+            yMin: limitMin,
+            yMax: limitMin,
+            borderColor: 'rgba(239,68,68,0.7)',
+            borderWidth: 2,
+            borderDash: [6, 4],
+            label: {
+                display: true,
+                content: `Mín: ${limitMin}`,
+                position: 'end',
+                backgroundColor: 'rgba(239,68,68,0.1)',
+                color: '#ef4444',
+                font: { size: 11, weight: '700', family: 'Inter' },
+                padding: 4
+            }
+        };
+    }
+
+    instrumentChart = new Chart(ctx, {
         type: 'line',
         data: {
             datasets: [{
-                label: 'PH',
+                label: selectedUnit || 'Valor',
                 data: chartData,
-                borderColor: '#00C895',
+                borderColor: CHART_COLOR,
                 backgroundColor: gradient,
                 borderWidth: 2.5,
-                pointBackgroundColor: ctx => {
-                    const evKey = (data[ctx.dataIndex]?.evento || '').toString().toUpperCase();
-                    return EVENTO_COLORS[evKey]?.border || '#00C895';
-                },
+                pointBackgroundColor: CHART_COLOR,
                 pointBorderColor: '#FFFFFF',
                 pointBorderWidth: 2,
                 pointRadius: 5,
@@ -299,14 +325,13 @@ async function updateChart(data) {
                 if (elements.length > 0) {
                     const idx = elements[0].index;
                     const point = chartData[idx];
-                    const evKey = (data[idx]?.evento || '').toString().toUpperCase();
-                    const evLabel = EVENTO_LABELS[evKey] || evKey;
+                    const unitStr = data[idx]?.unit || '';
                     const dateObj = new Date(point.x);
                     const formattedDate = dateObj.toLocaleString('es-MX', {
                         year: 'numeric', month: '2-digit', day: '2-digit',
                         hour: '2-digit', minute: '2-digit', second: '2-digit'
                     });
-                    showTooltip(formattedDate, point.y, evLabel);
+                    showTooltip(formattedDate, point.y, unitStr);
                     const tbody = document.getElementById('tableBody');
                     if (tbody && tbody.children[idx]) {
                         document.querySelectorAll('tbody tr').forEach(r => r.classList.remove('selected'));
@@ -317,44 +342,7 @@ async function updateChart(data) {
             },
             plugins: {
                 legend: { display: false },
-                annotation: {
-                    annotations: {
-                        limitMax: {
-                            type: 'line',
-                            yMin: limitMax,
-                            yMax: limitMax,
-                            borderColor: 'rgba(239,68,68,0.7)',
-                            borderWidth: 2,
-                            borderDash: [6, 4],
-                            label: {
-                                display: true,
-                                content: `Máx: ${limitMax}`,
-                                position: 'end',
-                                backgroundColor: 'rgba(239,68,68,0.1)',
-                                color: '#ef4444',
-                                font: { size: 11, weight: '700', family: 'Inter' },
-                                padding: 4
-                            }
-                        },
-                        limitMin: {
-                            type: 'line',
-                            yMin: limitMin,
-                            yMax: limitMin,
-                            borderColor: 'rgba(239,68,68,0.7)',
-                            borderWidth: 2,
-                            borderDash: [6, 4],
-                            label: {
-                                display: true,
-                                content: `Mín: ${limitMin}`,
-                                position: 'end',
-                                backgroundColor: 'rgba(239,68,68,0.1)',
-                                color: '#ef4444',
-                                font: { size: 11, weight: '700', family: 'Inter' },
-                                padding: 4
-                            }
-                        }
-                    }
-                },
+                annotation: { annotations },
                 tooltip: {
                     padding: 14,
                     backgroundColor: '#FFFFFF',
@@ -365,12 +353,7 @@ async function updateChart(data) {
                     cornerRadius: 10,
                     displayColors: false,
                     callbacks: {
-                        label: ctx => `PH: ${ctx.raw.y.toFixed(2)}`,
-                        afterLabel: ctx => {
-                            const evKey = (data[ctx.dataIndex]?.evento || '').toString().toUpperCase();
-                            const evLabel = EVENTO_LABELS[evKey] || evKey;
-                            return evLabel ? `Evento: ${evLabel}` : '';
-                        },
+                        label: ctx => `Valor: ${ctx.raw.y.toFixed(2)} ${data[ctx.dataIndex]?.unit || ''}`,
                         title: ctx => {
                             const date = new Date(ctx[0].raw.x);
                             return date.toLocaleString('es-MX', {
@@ -389,7 +372,7 @@ async function updateChart(data) {
                         displayFormats: { minute: 'HH:mm', hour: 'DD MMM HH:mm', day: 'DD MMM' }
                     },
                     title: {
-                        display: true, text: 'MOMENTO DE LECTURA (TIMESTAMP)',
+                        display: true, text: 'MARCA DE TIEMPO (CREATED_AT)',
                         color: '#64748B', font: { size: 12, weight: 600, family: 'Inter' }
                     },
                     grid: { color: '#E2E8F0', drawBorder: false },
@@ -397,13 +380,13 @@ async function updateChart(data) {
                 },
                 y: {
                     title: {
-                        display: true, text: 'NIVEL DE PH',
+                        display: true, text: `LECTURA DE INSTRUMENTO (${selectedUnit || 'VALOR'})`,
                         color: '#64748B', font: { size: 12, weight: 600, family: 'Inter' },
                         padding: { top: 0, bottom: 10 }
                     },
-                    min: minPh, max: maxPh,
+                    min: minY, max: maxY,
                     grid: { color: '#E2E8F0', drawBorder: false },
-                    ticks: { color: '#64748B', stepSize: 1, font: { size: 11, family: 'Inter' } }
+                    ticks: { color: '#64748B', font: { size: 11, family: 'Inter' } }
                 }
             }
         }
@@ -413,12 +396,16 @@ async function updateChart(data) {
 // ─────────────────────────────────────────────
 // Tooltip
 // ─────────────────────────────────────────────
-function showTooltip(timeStr, phValue, eventoLabel) {
+function showTooltip(timeStr, value, unitStr) {
     const tooltip = document.getElementById('chartTooltipData');
     document.getElementById('selectedTime').innerText = timeStr;
     const phEl = document.getElementById('selectedPh');
-    phEl.innerText = Number(phValue).toFixed(2);
-    phEl.className = 'ph-value' + ((phValue < 6.5 || phValue > 8.5) ? ' ph-value-danger' : '');
+    phEl.innerText = `${Number(value).toFixed(2)} ${unitStr}`;
+
+    const isPhDescarga = unitStr.toLowerCase().includes('descarga') || unitStr.toLowerCase() === 'ph';
+    const isOut = isPhDescarga && (value < limitMin || value > limitMax);
+    phEl.className = 'ph-value' + (isOut ? ' ph-value-danger' : '');
+
     tooltip.classList.remove('hidden');
     tooltip.style.transform = 'scale(1.02)';
     setTimeout(() => { tooltip.style.transform = 'scale(1)'; }, 200);
@@ -432,22 +419,20 @@ function exportToCSV() {
         alert('No hay datos para exportar.');
         return;
     }
-    let csvContent = 'Fecha y Hora,PH,Evento\n';
+    let csvContent = 'Fecha y Hora,Valor,Unidad\n';
     currentData.forEach(row => {
-        const dateObj = new Date(row.timestamp);
+        const dateObj = new Date(row.created_at);
         const formattedDate = dateObj.toLocaleString('es-MX', {
             year: 'numeric', month: '2-digit', day: '2-digit',
             hour: '2-digit', minute: '2-digit', second: '2-digit'
         }).replace(',', '');
-        const evKey   = (row.evento || '').toString().toUpperCase();
-        const evLabel = EVENTO_LABELS[evKey] || evKey || '';
-        csvContent += `${formattedDate},${row.PH},${evLabel}\n`;
+        csvContent += `${formattedDate},${row.extracted_value},${row.unit || ''}\n`;
     });
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url  = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'Reporte_PH_Solenis.csv');
+    link.setAttribute('download', 'Reporte_Instrumentos_Solenis.csv');
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -466,6 +451,5 @@ function showError(msg) {
         <div style="font-size:0.82rem;color:var(--text-muted);max-width:260px;margin:0 auto">${msg}</div>
     </td></tr>`;
 
-    // También ocultar el contador de resultados
     document.getElementById('resultsHeader').style.display = 'none';
 }

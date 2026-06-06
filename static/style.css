@@ -172,8 +172,9 @@ body {
     color: var(--text-color);
     padding: 9px 10px;
     border-radius: var(--border-radius-sm);
-    font-family: inherit;
+    font-family: 'Inter', sans-serif;
     font-size: 0.88rem;
+    height: 40px;
     outline: none;
     transition: all 0.2s ease;
     color-scheme: light;
@@ -291,6 +292,7 @@ body {
     transition: all 0.2s ease;
     box-shadow: 0 4px 10px rgba(0,200,149,0.3);
     font-family: inherit;
+    text-decoration: none;
 }
 
 .primary-btn:hover { background: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 6px 14px rgba(0,200,149,0.35); }
@@ -310,6 +312,7 @@ body {
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: inherit;
+    text-decoration: none;
 }
 
 .secondary-btn:hover { background: #F1F5F9; transform: translateY(-1px); }
@@ -614,4 +617,77 @@ th:last-child { text-align: center; }
 
     .top-navbar h1 { font-size: 0.95rem; white-space: normal; }
     .navbar-badge { display: none; }
+}
+
+/* ─── Navigation Tabs ─── */
+.navbar-nav {
+    display: flex;
+    gap: 8px;
+    margin-left: 24px;
+    flex-wrap: nowrap !important;
+    flex-shrink: 0;
+}
+
+.navbar-nav a.primary-btn,
+.navbar-nav a.secondary-btn {
+    text-decoration: none;
+    flex: none;
+    flex-shrink: 0 !important;
+}
+
+.nav-link {
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.88rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.nav-link:hover {
+    color: var(--primary-color);
+    background: rgba(0, 200, 149, 0.05);
+}
+
+.nav-link.active {
+    color: #007a5a;
+    background: rgba(0, 200, 149, 0.1);
+    border-color: rgba(0, 200, 149, 0.25);
+}
+
+.input-group select {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-color: #F8FAFC !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-color) !important;
+    padding: 9px 12px !important;
+    border-radius: var(--border-radius-sm) !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.88rem !important;
+    height: 40px !important;
+    outline: none !important;
+    transition: all 0.2s ease !important;
+    width: 100% !important;
+    cursor: pointer !important;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' viewBox='0 0 24 24' stroke='%2364748B' stroke-width='3'><path stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/></svg>") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 12px center !important;
+    padding-right: 32px !important;
+}
+
+.input-group select option {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.88rem;
+    background: #fff;
+    color: var(--text-color);
+}
+
+.input-group select:focus {
+    border-color: var(--primary-color) !important;
+    background-color: #fff !important;
+    box-shadow: 0 0 0 3px var(--primary-glow) !important;
 }

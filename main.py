@@ -37,17 +37,91 @@ class DataPoint(BaseModel):
     PH: float
     evento: Optional[str] = None   # texto: DESCARGA, INICIA, TERMINA
 
+class InstrumentDataPoint(BaseModel):
+    created_at: str
+    extracted_value: float
+    unit: str
+    instrument_type: Optional[str] = None
+    image_url: Optional[str] = None
+
+@app.get("/api/instrument_units")
+def get_instrument_units():
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Base de datos Supabase no configurada.")
+    try:
+        response = supabase.table("instrument_readings").select("unit").execute()
+        units = sorted(list(set(row["unit"] for row in response.data if row.get("unit"))))
+        return units
+    except Exception as e:
+        print(f"Error fetching instrument units: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener unidades de Supabase: {e}")
+
+@app.get("/api/instrument_data", response_model=List[InstrumentDataPoint])
+def get_instrument_data(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    unit: Optional[str] = None
+):
+    tz_local = _TZ_LOCAL
+
+    if start_date and end_date:
+        try:
+            d_start = date.fromisoformat(start_date[:10])
+            d_end   = date.fromisoformat(end_date[:10])
+            if (d_end - d_start).days > 62:
+                raise HTTPException(status_code=400, detail="El intervalo no puede superar 2 meses.")
+            if d_end < d_start:
+                raise HTTPException(status_code=400, detail="La fecha final no puede ser anterior a la inicial.")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de fecha inválido.")
+
+    def convertir_timestamp(data):
+        for row in data:
+            if row.get('created_at'):
+                utc_dt = datetime.fromisoformat(row['created_at'].replace('Z', '+00:00'))
+                row['created_at'] = utc_dt.astimezone(tz_local).strftime('%Y-%m-%dT%H:%M:%S')
+        return data
+
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Base de datos Supabase no configurada o desactivada.")
+
+    # Consulta real a Supabase
+    gte_val = None
+    lte_val = None
+    if start_date:
+        gte_val = start_date[:10] + "T06:00:00+00:00"
+    if end_date:
+        d_next = date.fromisoformat(end_date[:10]) + timedelta(days=1)
+        lte_val = d_next.isoformat() + "T05:59:59+00:00"
+
+    query = (
+        supabase.table("instrument_readings")
+        .select("created_at, extracted_value, unit, instrument_type, image_url")
+        .order("created_at", desc=True)
+    )
+
+    if gte_val:
+        query = query.gte("created_at", gte_val)
+    if lte_val:
+        query = query.lte("created_at", lte_val)
+    if unit:
+        query = query.eq("unit", unit)
+
+    response = query.execute()
+    data = convertir_timestamp(response.data)
+    return data
+
 @app.get("/api/parametros")
 def get_parametros():
     if not supabase:
-        return {"MIN_PH_DESC": 6.0, "MAX_PH_DESC": 8.0}
+        raise HTTPException(status_code=500, detail="Base de datos Supabase no configurada.")
     try:
         response = supabase.table("parametros").select("parametro, valor").in_("parametro", ["MIN_PH_DESC", "MAX_PH_DESC"]).execute()
         result = {row["parametro"]: row["valor"] for row in response.data}
         return result
     except Exception as e:
         print(f"Error fetching parametros: {e}")
-        return {"MIN_PH_DESC": 6.0, "MAX_PH_DESC": 8.0}
+        raise HTTPException(status_code=500, detail=f"Error al obtener parámetros de Supabase: {e}")
 
 @app.get("/api/data", response_model=List[DataPoint])
 def get_data(
@@ -79,24 +153,7 @@ def get_data(
         return data
 
     if not supabase:
-        import random
-        now = datetime.now()
-        mock = []
-        for i in range(50):
-            t = now - timedelta(hours=i * 2)
-            ph_value = round(random.uniform(6.5, 8.5), 2)
-            mock.append({
-                "timestamp": t.isoformat(),
-                "PH": ph_value,
-                "evento": ["DESCARGA", "INICIA", "TERMINA"][i % 3]
-            })
-        if start_date:
-            mock = [d for d in mock if d["timestamp"][:10] >= start_date[:10]]
-        if end_date:
-            mock = [d for d in mock if d["timestamp"][:10] <= end_date[:10]]
-        if evento:
-            mock = [d for d in mock if d.get("evento") in evento]
-        return convertir_timestamp(mock)
+        raise HTTPException(status_code=500, detail="Base de datos Supabase no configurada o desactivada.")
 
     # Consulta real a Supabase
     # México (UTC-6): 00:00 local = 06:00 UTC, 23:59:59 local = siguiente día 05:59:59 UTC
