@@ -40,7 +40,7 @@ def _publicar_evento_particle(nombre: str, datos: str) -> tuple[bool, str]:
         response = requests.post(
             PARTICLE_EVENTS_URL,
             headers={"Authorization": f"Bearer {ACCESS_TOKEN}"},
-            json=payload,          # application/json, no form-encoded
+            data=payload,    #<-- from-encoded, no json
             timeout=5,
         )
     except requests.exceptions.Timeout:
