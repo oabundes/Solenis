@@ -112,3 +112,14 @@ async def handle_comando_dart(
 
     # Comando no reconocido — no es un error del servidor (200), pero ok=False
     return {"ok": False, "mensaje": f"Comando '{comando}' no reconocido"}
+class BoronData(BaseModel):
+    device_id: str
+    ph:        float
+    level:     float
+    step:      int
+
+@router.post("/from-boron-data")
+async def handle_boron_data(data: BoronData):
+    print(f"[Boron] device={data.device_id} | "
+          f"pH={data.ph} | nivel={data.level}% | paso={data.step}")
+    return {"ok": True}
