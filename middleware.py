@@ -2,6 +2,9 @@ from fastapi import FastAPI, Form, Response, APIRouter, Header, HTTPException
 from pydantic import BaseModel
 import requests
 import os
+import json
+import google.auth.transport.requests
+from google.oauth2 import service_account
 
 router = APIRouter()
 
@@ -112,6 +115,51 @@ async def handle_comando_dart(
 
     # Comando no reconocido — no es un error del servidor (200), pero ok=False
     return {"ok": False, "mensaje": f"Comando '{comando}' no reconocido"}
+
+
+def _get_fcm_access_token() -> str:
+    credentials_json = os.getenv("FIREBASE_CREDENTIALS")
+    credentials_dict = json.loads(credentials_json)
+    credentials = service_account.Credentials.from_service_account_info(
+        credentials_dict,
+        scopes=["https://www.googleapis.com/auth/firebase.messaging"]
+    )
+    request = google.auth.transport.requests.Request()
+    credentials.refresh(request)
+    return credentials.token
+
+def _enviar_fcm(ph: float, level: float, step: int):
+    token      = os.getenv("FCM_TEST_TOKEN")
+    project_id = os.getenv("FIREBASE_PROJECT_ID")
+    access_token = _get_fcm_access_token()
+
+    url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
+    payload = {
+        "message": {
+            "token": token,
+            "notification": {
+                "title": "Tanque de Neutralización",
+                "body":  f"pH: {ph} | Nivel: {level}% | Paso: {step}"
+            },
+            "data": {
+                "ph":    str(ph),
+                "level": str(level),
+                "step":  str(step)
+            }
+        }
+    }
+    response = requests.post(
+        url,
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type":  "application/json"
+        },
+        json=payload,
+        timeout=5
+    )
+    print(f"[FCM] status={response.status_code} | {response.text}")
+    return response.status_code == 200
+
 class BoronData(BaseModel):
     device_id: str
     ph:        float
@@ -120,6 +168,18 @@ class BoronData(BaseModel):
 
 @router.post("/from-boron-data")
 async def handle_boron_data(data: BoronData):
+    ph    = float(data.ph)
+    level = float(data.level)
+    step  = int(data.step)
+
     print(f"[Boron] device={data.device_id} | "
-          f"pH={data.ph} | nivel={data.level}% | paso={data.step}")
+          f"pH={ph} | nivel={level}% | paso={step}")
+
+    _enviar_fcm(ph, level, step)
+
     return {"ok": True}
+
+
+
+
+
