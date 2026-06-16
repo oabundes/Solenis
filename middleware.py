@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import requests
 import os
 import json
+import base64
 import google.auth.transport.requests
 from google.oauth2 import service_account
 
@@ -118,7 +119,8 @@ async def handle_comando_dart(
 
 
 def _get_fcm_access_token() -> str:
-    credentials_json = os.getenv("FIREBASE_CREDENTIALS")
+    credentials_b64  = os.getenv("FIREBASE_CREDENTIALS")
+    credentials_json = base64.b64decode(credentials_b64).decode("utf-8")
     credentials_dict = json.loads(credentials_json)
     credentials = service_account.Credentials.from_service_account_info(
         credentials_dict,
@@ -149,12 +151,12 @@ def _enviar_fcm(ph: float, level: float, step: int):
             "android": {
                 "priority": "high",
                 "notification": {
-                    "sound":      "default",
-                    "priority":   "high",
-                    "visibility": "public"
-                }
+                "sound": "default",
+                "priority": "high",
+                "visibility": "public"
             }
         }
+     }
     }
     response = requests.post(
         url,
@@ -169,7 +171,7 @@ def _enviar_fcm(ph: float, level: float, step: int):
     return response.status_code == 200
 
 class BoronData(BaseModel):
-    device_id: str
+    device_id: str | None = None 
     ph:        float
     level:     float
     step:      int
