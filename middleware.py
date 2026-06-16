@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import requests
 import os
 import json
+import base64
 import google.auth.transport.requests
 from google.oauth2 import service_account
 
@@ -118,7 +119,8 @@ async def handle_comando_dart(
 
 
 def _get_fcm_access_token() -> str:
-    credentials_json = os.getenv("FIREBASE_CREDENTIALS")
+    credentials_b64  = os.getenv("FIREBASE_CREDENTIALS")
+    credentials_json = base64.b64decode(credentials_b64).decode("utf-8")
     credentials_dict = json.loads(credentials_json)
     credentials = service_account.Credentials.from_service_account_info(
         credentials_dict,
