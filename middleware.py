@@ -153,7 +153,8 @@ def _enviar_fcm(ph: float, level: float, step: int):
                 "notification": {
                     "sound":      "default",
                     "notification_priority": "PRIORITY_HIGH",
-                    "visibility": "public"
+                    "visibility": "public",
+                    "channel_id": "tanque_canal"   # ← debe coincidir
                 }
             }
         }
