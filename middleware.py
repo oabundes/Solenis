@@ -152,7 +152,7 @@ def _enviar_fcm(ph: float, level: float, step: int):
                 "priority": "high",
                 "notification": {
                     "sound":      "default",
-                    "priority":   "high",
+                    "notification_priority": "PRIORITY_HIGH",
                     "visibility": "public"
                 }
             }
