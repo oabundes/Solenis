@@ -147,16 +147,8 @@ def _enviar_fcm(ph: float, level: float, step: int):
                 "ph":    str(ph),
                 "level": str(level),
                 "step":  str(step)
-            },
-            "android": {
-                "priority": "high",
-                "notification": {
-                "sound": "default",
-                "priority": "high",
-                "visibility": "public"
             }
         }
-     }
     }
     response = requests.post(
         url,
