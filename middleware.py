@@ -169,7 +169,7 @@ def _enviar_fcm(ph: float, level: float, step: int):
     return response.status_code == 200
 
 class BoronData(BaseModel):
-    device_id: str
+    device_id: str | None = None
     ph:        float
     level:     float
     step:      int
