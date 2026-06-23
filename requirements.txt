@@ -7,4 +7,5 @@ httpx
 python-multipart
 requests
 google-auth
+redis[asyncio]
 
