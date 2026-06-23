@@ -244,8 +244,3 @@ async def handle_boron_data(data: BoronData):
     await _guardar_en_redis(ph, level, step)
  
     return {"ok": True}
-
-
-act
-
-
