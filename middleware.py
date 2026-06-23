@@ -226,12 +226,26 @@ async def handle_boron_data(data: BoronData):
     print(f"[Boron] device={data.device_id} | "
           f"pH={ph} | nivel={level}% | paso={step}")
 
-    await _guardar_en_redis(ph, level, step)
+
     _enviar_fcm(ph, level, step)
 
     return {"ok": True}
 
 
+@router.post("/actualiza-redis")
+async def handle_boron_data(data: BoronData):
+    ph    = float(data.ph)
+    level = float(data.level)
+    step  = int(data.step)
 
+    print(f"[Boron] device={data.device_id} | "
+          f"pH={ph} | nivel={level}% | paso={step}")
+
+    await _guardar_en_redis(ph, level, step)
+ 
+    return {"ok": True}
+
+
+act
 
 
