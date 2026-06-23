@@ -4,6 +4,7 @@ import requests
 import os
 import json
 import base64
+import aioredis
 import google.auth.transport.requests
 from google.oauth2 import service_account
 
@@ -171,6 +172,22 @@ def _enviar_fcm(ph: float, level: float, step: int):
     print(f"[FCM] status={response.status_code} | {response.text}")
     return response.status_code == 200
 
+async def _guardar_en_redis(ph: float, level: float, step: int):
+    """
+    Guarda el estado actual del tanque en Redis.
+    TTL de 300 segundos (5 min) — si el Boron deja de publicar,
+    los datos expiran solos y no quedan valores obsoletos.
+    """
+    redis = await aioredis.from_url(os.getenv("REDIS_URL"))
+    await redis.hset("tanque:estado", mapping={
+        "ph":    str(ph),
+        "level": str(level),
+        "step":  str(step),
+    })
+    await redis.expire("tanque:estado", 300)
+    await redis.aclose()
+    print(f"[Redis] estado guardado → pH={ph} | nivel={level}% | paso={step}")
+
 class BoronData(BaseModel):
     device_id: str | None = None
     ph:        str
@@ -186,6 +203,7 @@ async def handle_boron_data(data: BoronData):
     print(f"[Boron] device={data.device_id} | "
           f"pH={ph} | nivel={level}% | paso={step}")
 
+    await _guardar_en_redis(ph, level, step)
     _enviar_fcm(ph, level, step)
 
     return {"ok": True}
