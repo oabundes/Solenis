@@ -188,6 +188,29 @@ async def _guardar_en_redis(ph: float, level: float, step: int):
     await client.aclose()
     print(f"[Redis] estado guardado → pH={ph} | nivel={level}% | paso={step}")
 
+
+@router.get("/estado")
+async def get_estado():
+    """Devuelve el último estado del tanque guardado en Redis."""
+    try:
+        client = await redis.asyncio.from_url(os.getenv("REDIS_URL"))
+        estado = await client.hgetall("tanque:estado")
+        await client.aclose()
+
+        if not estado:
+            return {"ph": 0.0, "level": 0.0, "step": 0}
+
+        return {
+            "ph":    float(estado[b"ph"]),
+            "level": float(estado[b"level"]),
+            "step":  int(estado[b"step"]),
+        }
+    except Exception as e:
+        print(f"[Redis] Error al leer estado: {e}")
+        return {"ph": 0.0, "level": 0.0, "step": 0}
+
+
+
 class BoronData(BaseModel):
     device_id: str | None = None
     ph:        str
