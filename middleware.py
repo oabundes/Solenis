@@ -372,7 +372,7 @@ async def estado_stream(request: Request):
     });
     ```
     """
-    return StreamingHttpResponse(
+    return StreamingResponse(
         event_generator(request),
         media_type="text/event-stream",
         headers={
