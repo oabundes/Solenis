@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Form, Response, APIRouter, Header, HTTPException, Request
-from fastapi.responses import StreamingHttpResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import requests
 import os
