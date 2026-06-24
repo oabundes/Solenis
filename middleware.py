@@ -60,7 +60,7 @@ async def event_generator(request: Request):
             os.getenv("REDIS_URL"),
             decode_responses=True,
             socket_keepalive=True,
-            socket_keepalive_inactivity_timeout=5,
+           
         )
         pubsub = redis_client.pubsub()
         await pubsub.subscribe(CHANNEL_NAME)
