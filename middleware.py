@@ -1,14 +1,27 @@
-from fastapi import FastAPI, Form, Response, APIRouter, Header, HTTPException
+from fastapi import FastAPI, Form, Response, APIRouter, Header, HTTPException, Request
+from fastapi.responses import StreamingHttpResponse
 from pydantic import BaseModel
 import requests
 import os
 import json
 import base64
+import redis.asyncio as aioredis
 import redis
+import asyncio
+import logging
 import google.auth.transport.requests
 from google.oauth2 import service_account
 
+# ============ LOGGING ============
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+# ============ SSE CONFIGURATION ============
+CHANNEL_NAME = "canal_actualizacion_tanque"
+HEARTBEAT_INTERVAL = 25  # segundos (Railway/Cloudflare timeout ~30s)
+MESSAGE_TIMEOUT = 1.0    # timeout para esperar mensaje en Redis
 
 # ---------------------------------------------------------------------------
 # Variables de entorno — validación temprana al importar el módulo.
@@ -25,9 +38,139 @@ if not DEVICE_ID:
     raise RuntimeError("Variable de entorno BORON2_ID no definida")
 
 # ---------------------------------------------------------------------------
-# Helper interno — lógica compartida de publicación de evento en Particle.
-# Ambos endpoints (Twilio y Dart) la usan; un solo lugar donde corregir.
+# SSE Event Generator — Escucha Redis Pub/Sub y envía eventos en tiempo real
 # ---------------------------------------------------------------------------
+async def event_generator(request: Request):
+    """
+    Generador que escucha Redis Pub/Sub y envía eventos SSE.
+    
+    Características:
+    - Heartbeat inteligente (25s) para evitar timeouts de proxy
+    - Validación de JSON antes de enviar
+    - Cierre seguro de recursos
+    - Logging para debugging en Railway
+    """
+    redis_client = None
+    pubsub = None
+    last_heartbeat = asyncio.get_event_loop().time()
+    
+    try:
+        # Conectarse a Redis con opciones de persistencia
+        redis_client = aioredis.from_url(
+            os.getenv("REDIS_URL"),
+            decode_responses=True,
+            socket_keepalive=True,
+            socket_keepalive_inactivity_timeout=5,
+        )
+        pubsub = redis_client.pubsub()
+        await pubsub.subscribe(CHANNEL_NAME)
+        logger.info(f"[SSE] Cliente conectado, escuchando {CHANNEL_NAME}")
+        
+        while True:
+            # ✅ Verificar desconexión del cliente
+            if await request.is_disconnected():
+                logger.info("[SSE] Cliente desconectado (cliente cerró conexión)")
+                break
+            
+            # ✅ Escuchar mensaje con timeout
+            try:
+                message = await asyncio.wait_for(
+                    pubsub.get_message(
+                        ignore_subscribe_messages=True,
+                        timeout=MESSAGE_TIMEOUT
+                    ),
+                    timeout=MESSAGE_TIMEOUT + 0.1
+                )
+            except asyncio.TimeoutError:
+                message = None
+            
+            current_time = asyncio.get_event_loop().time()
+            time_since_heartbeat = current_time - last_heartbeat
+            
+            # ✅ Si hay mensaje: enviar datos
+            if message:
+                try:
+                    data = message['data']
+                    
+                    # Validar que sea JSON válido
+                    if isinstance(data, str):
+                        json.loads(data)  # Verifica que sea JSON válido
+                    
+                    yield f"data: {data}\n\n"
+                    logger.debug(f"[SSE] Evento enviado: {data[:100]}")
+                    last_heartbeat = current_time
+                    
+                except json.JSONDecodeError as e:
+                    logger.error(f"[SSE] Dato recibido no es JSON válido: {data} - {e}")
+                    continue
+                except Exception as e:
+                    logger.error(f"[SSE] Error procesando mensaje: {e}")
+                    continue
+            
+            # ✅ Heartbeat inteligente
+            elif time_since_heartbeat >= HEARTBEAT_INTERVAL:
+                yield ": ping\n\n"
+                last_heartbeat = current_time
+                logger.debug("[SSE] Heartbeat enviado")
+            
+            # ✅ Pequeño sleep para no bloquear el loop
+            await asyncio.sleep(0.05)
+    
+    except asyncio.CancelledError:
+        logger.info("[SSE] Tarea cancelada (probablemente por Railway/proxy)")
+        
+    except Exception as e:
+        logger.error(f"[SSE] Error no esperado en event_generator: {e}", exc_info=True)
+        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    
+    finally:
+        # ✅ Cierre seguro y completo
+        if pubsub:
+            try:
+                await pubsub.unsubscribe(CHANNEL_NAME)
+                await pubsub.close()
+                logger.info("[SSE] PubSub cerrado correctamente")
+            except Exception as e:
+                logger.error(f"[SSE] Error cerrando pubsub: {e}")
+        
+        if redis_client:
+            try:
+                await redis_client.close()
+                logger.info("[SSE] Cliente Redis cerrado correctamente")
+            except Exception as e:
+                logger.error(f"[SSE] Error cerrando cliente Redis: {e}")
+
+
+async def _guardar_y_publicar(ph: float, level: float, step: int):
+    """
+    Guarda el estado en Redis caché Y publica en Pub/Sub para SSE.
+    Una sola conexión, dos operaciones atómicas — más eficiente.
+    
+    TTL: 300 segundos (5 min) — si el Boron deja de publicar,
+    los datos expiran solos y no quedan valores obsoletos.
+    """
+    try:
+        client = aioredis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+        
+        # 1. Guardar en hash con TTL
+        await client.hset("tanque:estado", mapping={
+            "ph":    str(ph),
+            "level": str(level),
+            "step":  str(step),
+        })
+        await client.expire("tanque:estado", 300)
+        
+        # 2. Publicar en Pub/Sub (misma conexión)
+        estado_json = json.dumps({"ph": ph, "level": level, "step": step})
+        await client.publish(CHANNEL_NAME, estado_json)
+        
+        await client.aclose()
+        logger.info(f"[Redis] Guardado + publicado → pH={ph} | nivel={level}% | paso={step}")
+        
+    except Exception as e:
+        logger.error(f"[Redis] Error: {e}")
+
+
 PARTICLE_EVENTS_URL = "https://api.particle.io/v1/devices/events"
 
 def _publicar_evento_particle(nombre: str, datos: str) -> tuple[bool, str]:
@@ -178,22 +321,25 @@ async def _guardar_en_redis(ph: float, level: float, step: int):
     TTL de 300 segundos (5 min) — si el Boron deja de publicar,
     los datos expiran solos y no quedan valores obsoletos.
     """
-    client = await redis.asyncio.from_url(os.getenv("REDIS_URL"))
-    await client.hset("tanque:estado", mapping={
-        "ph":    str(ph),
-        "level": str(level),
-        "step":  str(step),
-    })
-    await client.expire("tanque:estado", 300)
-    await client.aclose()
-    print(f"[Redis] estado guardado → pH={ph} | nivel={level}% | paso={step}")
+    try:
+        client = aioredis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
+        await client.hset("tanque:estado", mapping={
+            "ph":    str(ph),
+            "level": str(level),
+            "step":  str(step),
+        })
+        await client.expire("tanque:estado", 300)
+        await client.aclose()
+        logger.info(f"[Redis] estado guardado → pH={ph} | nivel={level}% | paso={step}")
+    except Exception as e:
+        logger.error(f"[Redis] Error guardando estado: {e}")
 
 
 @router.get("/estado")
 async def get_estado():
     """Devuelve el último estado del tanque guardado en Redis."""
     try:
-        client = await redis.asyncio.from_url(os.getenv("REDIS_URL"))
+        client = await aioredis.from_url(os.getenv("REDIS_URL"), decode_responses=True)
         estado = await client.hgetall("tanque:estado")
         await client.aclose()
 
@@ -201,13 +347,44 @@ async def get_estado():
             return {"ph": 0.0, "level": 0.0, "step": 0}
 
         return {
-            "ph":    float(estado[b"ph"]),
-            "level": float(estado[b"level"]),
-            "step":  int(estado[b"step"]),
+            "ph":    float(estado["ph"]),
+            "level": float(estado["level"]),
+            "step":  int(estado["step"]),
         }
     except Exception as e:
-        print(f"[Redis] Error al leer estado: {e}")
+        logger.error(f"[Redis] Error al leer estado: {e}")
         return {"ph": 0.0, "level": 0.0, "step": 0}
+
+
+@router.get("/estado-stream")
+async def estado_stream(request: Request):
+    """
+    Endpoint SSE para actualización en tiempo real del estado del tanque.
+    
+    Uso desde Flutter:
+    ```dart
+    final response = await client.send(request);
+    response.stream.transform(utf8.decoder).listen((event) {
+      if (event.startsWith('data: ')) {
+        final json = event.substring(6);
+        // Procesar estado...
+      }
+    });
+    ```
+    """
+    return StreamingHttpResponse(
+        event_generator(request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-Accel-Buffering": "no",  # Importante para proxies (Cloudflare, Railway)
+            "Connection": "keep-alive",
+        }
+    )
+
+
 
 
 
@@ -223,24 +400,28 @@ async def handle_boron_data(data: BoronData):
     level = float(data.level)
     step  = int(data.step)
 
-    print(f"[Boron] device={data.device_id} | "
-          f"pH={ph} | nivel={level}% | paso={step}")
+    logger.info(f"[Boron] device={data.device_id} | "
+                f"pH={ph} | nivel={level}% | paso={step}")
 
-
+    # Guardar en Redis 
+    await  _guardar_en_redis(ph, level, step)
+    
+    # Enviar notificación FCM
     _enviar_fcm(ph, level, step)
 
     return {"ok": True}
 
 
 @router.post("/actualiza-redis")
-async def handle_boron_data(data: BoronData):
+async def handle_actualiza_redis(data: BoronData):
     ph    = float(data.ph)
     level = float(data.level)
     step  = int(data.step)
 
-    print(f"[Boron] device={data.device_id} | "
-          f"pH={ph} | nivel={level}% | paso={step}")
+    logger.info(f"[Boron] device={data.device_id} | "
+                f"pH={ph} | nivel={level}% | paso={step}")
 
-    await _guardar_en_redis(ph, level, step)
+    # Guardar en Redis + publicar en Pub/Sub (una sola operación)
+    await _guardar_y_publicar(ph, level, step)
  
-    return {"ok": True}
+    return {"ok": True, "fuente":"redis"}
