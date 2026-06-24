@@ -60,7 +60,6 @@ async def event_generator(request: Request):
             os.getenv("REDIS_URL"),
             decode_responses=True,
             socket_keepalive=True,
-           
         )
         pubsub = redis_client.pubsub()
         await pubsub.subscribe(CHANNEL_NAME)
@@ -275,14 +274,13 @@ def _get_fcm_access_token() -> str:
     return credentials.token
 
 def _enviar_fcm(ph: float, level: float, step: int):
-    token      = os.getenv("FCM_TEST_TOKEN")
-    project_id = os.getenv("FIREBASE_PROJECT_ID")
+    project_id   = os.getenv("FIREBASE_PROJECT_ID")
     access_token = _get_fcm_access_token()
 
     url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
     payload = {
         "message": {
-            "token": token,
+            "topic": "notificaciones_neutralizacion",  # ← Tema global
             "notification": {
                 "title": "Tanque de Neutralización",
                 "body":  f"pH: {ph} | Nivel: {level}% | Paso: {step}"
@@ -298,7 +296,7 @@ def _enviar_fcm(ph: float, level: float, step: int):
                     "sound":      "default",
                     "notification_priority": "PRIORITY_HIGH",
                     "visibility": "public",
-                    "channel_id": "tanque_canal"   # ← debe coincidir
+                    "channel_id": "tanque_canal"
                 }
             }
         }
@@ -312,7 +310,7 @@ def _enviar_fcm(ph: float, level: float, step: int):
         json=payload,
         timeout=5
     )
-    print(f"[FCM] status={response.status_code} | {response.text}")
+    logger.info(f"[FCM] status={response.status_code} | {response.text}")
     return response.status_code == 200
 
 async def _guardar_en_redis(ph: float, level: float, step: int):
@@ -403,8 +401,8 @@ async def handle_boron_data(data: BoronData):
     logger.info(f"[Boron] device={data.device_id} | "
                 f"pH={ph} | nivel={level}% | paso={step}")
 
-    # Guardar en Redis 
-    await  _guardar_en_redis(ph, level, step)
+    # Guardar en Redis + publicar en Pub/Sub (una sola operación)
+    await _guardar_y_publicar(ph, level, step)
     
     # Enviar notificación FCM
     _enviar_fcm(ph, level, step)
