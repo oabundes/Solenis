@@ -272,18 +272,26 @@ def _get_fcm_access_token() -> str:
     request = google.auth.transport.requests.Request()
     credentials.refresh(request)
     return credentials.token
-
-def _enviar_fcm(ph: float, level: float, step: int):
+causas = {
+    0: "Tanque de Neutralización",
+    10: "NIVEL ALTO EN TANQUE",
+    20: "NIVEL DE HOMGENEIZACION",
+    100: "FALLA DE SENSOR",
+    # Agrega más códigos según sea necesario
+}
+def _enviar_fcm(ph: float, level: float, step: int, causa: int| None = None) -> bool:
     project_id   = os.getenv("FIREBASE_PROJECT_ID")
     access_token = _get_fcm_access_token()
-
+    title = causas.get(causa, "Causa desconocida");
+     
     url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
     payload = {
         "message": {
             "topic": "notificaciones_neutralizacion",  # ← Tema global
             "notification": {
-                "title": "Tanque de Neutralización",
-                "body":  f"pH: {ph} | Nivel: {level}% | Paso: {step}"
+#                "title": "Tanque de Neutralización",
+                "title":  f"{title}",
+                "body":  f" pH: {ph} | Nivel: {level}% | Paso: {step}"
             },
             "data": {
                 "ph":    str(ph),
@@ -391,13 +399,14 @@ class BoronData(BaseModel):
     ph:        str
     level:     str
     step:      str
+    causa:     str | None = None  # opcional, para debug
 
 @router.post("/from-boron-data")
 async def handle_boron_data(data: BoronData):
     ph    = float(data.ph)
     level = float(data.level)
     step  = int(data.step)
-
+    causa = int(data.causa) 
     logger.info(f"[Boron] device={data.device_id} | "
                 f"pH={ph} | nivel={level}% | paso={step}")
 
@@ -405,7 +414,7 @@ async def handle_boron_data(data: BoronData):
     await _guardar_y_publicar(ph, level, step)
     
     # Enviar notificación FCM
-    _enviar_fcm(ph, level, step)
+    _enviar_fcm(ph, level, step,causa)
 
     return {"ok": True}
 
