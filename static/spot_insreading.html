@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Lecturas de Instrumentos - SPOT</title>
+    <meta name="description" content="Reporte de lecturas de instrumentos. Datos en tiempo real de Supabase y SPOT.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- CSS (Custom SPOT Style) -->
+    <link rel="stylesheet" href="spot_style.css">
+    <!-- Chart.js & Moment for Time Series -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
+</head>
+<body>
+    <!-- Top Navbar -->
+    <nav class="top-navbar">
+        <div class="logo">
+            <img src="spot_logo.svg" alt="SPOT Logo" style="height: 40px;"/>
+        </div>
+        <div class="navbar-title">
+            <span class="navbar-subtitle">Dashboard de Monitoreo SPOT</span>
+            <h1>REPORTE DE LECTURA DE INSTRUMENTOS</h1>
+        </div>
+        <div class="navbar-nav">
+            <a href="index.html" class="primary-btn">Inicio Solenis</a>
+        </div>
+        <div class="navbar-badge" id="statusBadge">
+            <span class="status-dot"></span>
+            <span id="statusText">En línea</span>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Panel Izquierdo -->
+        <div class="left-panel">
+
+            <!-- Control de Filtro de Fechas y Unidades -->
+            <div class="controls-card fade-in">
+                <h2>Filtros de Búsqueda</h2>
+
+                <div class="date-controls">
+                    <!-- Dropdown Filtro Unidad -->
+                    <div class="input-group">
+                        <select id="unitFilter" name="unitFilter">
+                            <option value="">Todas las unidades</option>
+                        </select>
+                    </div>
+
+                    <!-- Fechas -->
+                    <div class="date-row">
+                        <div class="input-group">
+                            <label for="startDate">Fecha Inicial</label>
+                            <input type="date" id="startDate" name="startDate">
+                        </div>
+                        <div class="input-group">
+                            <label for="endDate">Fecha Final</label>
+                            <input type="date" id="endDate" name="endDate">
+                        </div>
+                    </div>
+
+                    <!-- Alerta rango -->
+                    <div id="rangeAlert" class="range-alert hidden">
+                        ⚠️ El rango no puede superar <strong>2 meses</strong>.
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="button-group">
+                        <button id="filterBtn" class="primary-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/></svg>
+                            Consultar
+                        </button>
+                        <button id="exportBtn" class="secondary-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                            Exportar CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contador de resultados -->
+            <div class="results-header" id="resultsHeader" style="display:none;">
+                <span id="resultCount" class="result-count">0 registros</span>
+                <span id="resultRange" class="result-range"></span>
+            </div>
+
+            <!-- Banner datos simulados -->
+            <div id="simulatedBanner" class="simulated-banner hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                Sin conexión al servidor — mostrando <strong>datos simulados</strong>
+            </div>
+
+            <!-- Tabla de Resultados -->
+            <div class="table-container fade-in delay-1">
+                <div class="table-scroll">
+                    <table id="dataTable" style="table-layout: fixed;">
+                        <colgroup>
+                            <col style="width: 54%">
+                            <col style="width: 20%">
+                            <col style="width: 26%">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Fecha y Hora</th>
+                                <th>Valor</th>
+                                <th>Unidad</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr>
+                                <td colspan="3" style="text-align: center; color: var(--text-muted)">Cargando datos...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Derecho -->
+        <div class="right-panel">
+            <!-- Gráfica -->
+            <div class="chart-card fade-in delay-2">
+                <!-- Filtro Evento alternativo -->
+                <div class="evento-filter chart-evento-filter">
+                    <label class="filter-label">Acciones</label>
+                    <div class="checkbox-filter-row" style="justify-content: flex-end;">
+                        <button id="refreshBtn" class="refresh-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582M20 20v-5h-.581M5.635 15A9 9 0 1 0 4.582 9H4"/></svg>
+                            Actualizar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="chart-header">
+                    <h2>Gráfica de Tendencia de Instrumentos</h2>
+                    <!-- Información del punto seleccionado -->
+                    <div id="chartTooltipData" class="selected-point-info hidden">
+                        <span class="pulse-dot"></span>
+                        <strong>Punto:</strong>&nbsp;<span id="selectedTime"></span>&nbsp;—&nbsp;Valor:&nbsp;<span id="selectedPh" class="ph-value"></span>
+                    </div>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="instrumentChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="spot_insreading.js"></script>
+</body>
+</html>

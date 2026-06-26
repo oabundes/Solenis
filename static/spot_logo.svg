@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="160" height="40">
+  <g transform="skewX(-12)" font-family="'Inter', 'Arial Black', sans-serif" font-weight="900" font-style="italic">
+    <!-- S -->
+    <text x="15" y="62" font-size="62" fill="#FFFFFF" letter-spacing="-2">S</text>
+    <!-- P -->
+    <text x="62" y="62" font-size="62" fill="#FFFFFF" letter-spacing="-2">P</text>
+    <!-- O (Curved arrows) -->
+    <g transform="translate(118, 12)">
+      <!-- Top arrow -->
+      <path d="M 6,26 A 18,15 0 0,1 38,18" fill="none" stroke="#9CA3AF" stroke-width="8" stroke-linecap="round"/>
+      <path d="M 32,23 L 42,16 L 33,9 Z" fill="#9CA3AF"/>
+      
+      <!-- Bottom arrow -->
+      <path d="M 40,22 A 18,15 0 0,1 8,30" fill="none" stroke="#9CA3AF" stroke-width="8" stroke-linecap="round"/>
+      <path d="M 14,25 L 4,32 L 13,39 Z" fill="#9CA3AF"/>
+    </g>
+    <!-- T -->
+    <text x="178" y="62" font-size="62" fill="#FFFFFF" letter-spacing="-2">T</text>
+  </g>
+</svg>

@@ -273,12 +273,13 @@ def _get_fcm_access_token() -> str:
     credentials.refresh(request)
     return credentials.token
 causas = {
-    0: "Tanque de Neutralización",
-    10: "NIVEL ALTO EN TANQUE",
-    20: "NIVEL DE HOMGENEIZACION",
-    100: "FALLA DE SENSOR",
-    # Agrega más códigos según sea necesario
+ 
+    0: "🛢️ Tanque de Neutralización",      # Normal/actualización
+    10: "🔴 NIVEL ALTO EN TANQUE",         # Crítico - desbordamiento
+    20: "🌀 NIVEL DE HOMOGENIZACIÓN",      # Procesando
+    100: "🚨 FALLA DE SENSOR"              # Error crítico
 }
+
 def _enviar_fcm(ph: float, level: float, step: int, causa: int| None = None) -> bool:
     project_id   = os.getenv("FIREBASE_PROJECT_ID")
     access_token = _get_fcm_access_token()

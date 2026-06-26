@@ -1,0 +1,86 @@
+@import url("style.css");
+
+:root {
+    --primary-color:  #1633F6; /* Vibrant SPOT Blue */
+    --primary-hover:  #0c26d9;
+    --primary-glow:   rgba(22, 51, 246, 0.18);
+    --bg-color:       #EEF2F7;
+    --panel-bg:       #FFFFFF;
+    --text-color:     #051C2C;
+    --text-muted:     #64748B;
+    --border-color:   #E2E8F0;
+    --danger-color:   #ef4444;
+    --success-color:  #10b981;
+    --warning-color:  #f59e0b;
+    --info-color:     #1633F6;
+}
+
+body {
+    background-image:
+        radial-gradient(ellipse at 10% 0%, rgba(22, 51, 246, 0.08) 0%, transparent 55%),
+        radial-gradient(ellipse at 90% 100%, rgba(5, 28, 44, 0.05) 0%, transparent 50%);
+}
+
+/* ─── Top Navbar (SPOT Blue themed) ─── */
+.top-navbar {
+    background: var(--primary-color);
+    color: #FFFFFF;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.top-navbar h1 {
+    color: #FFFFFF;
+}
+
+.navbar-subtitle {
+    color: #93C5FD;
+}
+
+.navbar-badge {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #FFFFFF;
+}
+
+.status-dot {
+    background: #38BDF8; /* Sky blue pulsing dot */
+}
+
+/* ─── Navigation Buttons inside top navbar ─── */
+.top-navbar .primary-btn {
+    background: rgba(255, 255, 255, 0.15);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.top-navbar .primary-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* ─── Table Selected Row Highlight ─── */
+tbody tr.selected {
+    background-color: rgba(22, 51, 246, 0.05) !important;
+    border-left: 3px solid var(--primary-color);
+}
+
+/* ─── Checkbox and filters ─── */
+.checkbox-item input:checked + .checkbox-box {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+/* ─── Scrollbars & miscellaneous ─── */
+.table-scroll::-webkit-scrollbar-thumb:hover {
+    background: #a5b4fc;
+}
+
+/* ─── Selected point info pulse ─── */
+.selected-point-info {
+    border: 1px solid rgba(22, 51, 246, 0.2);
+    background: rgba(22, 51, 246, 0.05);
+}
+
+.selected-point-info .pulse-dot {
+    background: var(--primary-color);
+}
